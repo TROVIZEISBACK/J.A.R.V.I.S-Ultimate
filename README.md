@@ -218,3 +218,6 @@ API-brain request settings: model `claude-opus-5-5`, `thinking: adaptive` with `
 **Privacy:** in the default push-to-talk mode, only what you say between ⌘H and ⌘S is recorded, and it goes to Google's free speech recognition. In `wake` mode every phrase the mic picks up goes there, because that's how the wake word is detected. Requests, screenshots (including a wired phone's screen) and camera frames go to Anthropic, through either Claude Code or the API. Image descriptions go to Cloudflare.
 
 The local server only accepts websocket connections from its own page. This stops other websites open in your browser from sending JARVIS commands. The remote port (8766, off unless you turn it on) serves only paired devices; see *Phones, tablets and Windows PCs*.
+
+## License
+[MIT](LICENSE)
