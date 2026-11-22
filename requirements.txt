@@ -16,3 +16,5 @@ pyobjc-framework-EventKit
 sympy
 scipy
 pyobjc-framework-AVFoundation
+yt-dlp[default]
+imageio-ffmpeg
