@@ -7,7 +7,7 @@ from pathlib import Path
 
 import aiohttp
 
-from . import computer, devices, imagegen, macos, memory, sysinfo, video
+from . import computer, devices, history, imagegen, macos, memory, sysinfo, video
 
 # --- Tool declarations ---------------------------------------------------------
 
@@ -235,6 +235,16 @@ COMPUTE_PRELUDE = (
 )
 
 CUSTOM_TOOLS += [
+    _tool(
+        "recall",
+        "Search the complete, word-for-word log of every past conversation with the user (what they said, "
+        "what you answered, what you did). Use it when they refer to something from the past that isn't in "
+        "your conversation memory, or ask what was said on a given day. query = words that must all appear "
+        "(any order); date = one day as YYYY-MM-DD; give either or both. Returns the matching exchanges, "
+        "newest first up to limit (default 8).",
+        {"query": {"type": "string"}, "date": {"type": "string", "description": "YYYY-MM-DD"},
+         "limit": {"type": "integer"}},
+    ),
     _tool(
         "watch_video",
         "Watch a video: a YouTube (or other video site) link, or a video file on this Mac. You get "
@@ -504,6 +514,12 @@ class ToolRunner:
                 await hub.event("hud", {"action": "device_screen", "title": "PHONE",
                                         "image": "data:image/jpeg;base64," + out[0]["source"]["data"]})
             return out
+
+        if name == "recall":
+            if not (inp.get("query") or inp.get("date")):
+                return "Give a query, a date (YYYY-MM-DD), or both."
+            return await asyncio.to_thread(history.search, str(inp.get("query") or ""), str(inp.get("date") or ""),
+                                           inp.get("limit") or 8)
 
         if name == "watch_video":
             async def progress(text):

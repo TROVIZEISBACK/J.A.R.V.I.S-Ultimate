@@ -3,7 +3,8 @@ import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DATA_DIR = ROOT / "data"
+DATA_DIR = Path(os.environ.get("JARVIS_DATA_DIR") or ROOT / "data")  # a test copy can use a scratch folder
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 UI_DIR = ROOT / "ui"
 
 
@@ -77,6 +78,13 @@ MIC_ENABLED = _flag("JARVIS_MIC", True)
 MAX_RECORDING = float(os.environ.get("JARVIS_MAX_RECORDING", "300"))  # seconds; ⌘H recordings stop and send after this
 MIC_MODE = os.environ.get("JARVIS_MIC_MODE", "push").lower()
 OPEN_BROWSER = _flag("JARVIS_OPEN_BROWSER", True)
+
+# Conversation memory (see jarvis/history.py): every exchange is logged on this computer and carried
+# into later conversations as a summary. The live conversation is compacted when it fills COMPACT_AT
+# percent of the model's context window, and after IDLE_RESET_MINUTES of silence.
+HISTORY = _flag("JARVIS_HISTORY", True)
+COMPACT_AT = float(os.environ.get("JARVIS_COMPACT_AT", "60"))
+CONTEXT_WINDOW = int(os.environ.get("JARVIS_CONTEXT_WINDOW", "0"))  # tokens; 0 = ask the model
 
 OWNER = os.environ.get("JARVIS_OWNER", "sir")
 IDLE_RESET_MINUTES = float(os.environ.get("JARVIS_IDLE_RESET_MINUTES", "20"))

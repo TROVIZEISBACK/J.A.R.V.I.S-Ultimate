@@ -22,6 +22,7 @@ from .brain import Brain
 from .brain_code import CodeBrain
 from .tools import ToolRunner, weather
 from .remote import COOKIE, RemoteAccess, lan_ip
+from .history import ConversationMemory
 from .voice import Listener, Speaker, recognize, strip_wake_word
 
 STOP_RE = re.compile(r"^(stop|cancel|abort|halt|shut up|be quiet|quiet|silence|never ?mind|that's enough|enough)\b", re.I)
@@ -52,6 +53,7 @@ class Hub:
         self.agenda_authorized = False
         self.alerted: dict[str, float] = {}
         self.modes = ModeState()
+        self.history: ConversationMemory | None = None  # the log of every exchange, and compaction
         self.remote = RemoteAccess()
         self.remote_clients: set[web.WebSocketResponse] = set()  # phones, tablets, PCs
         self.voice_target: web.WebSocketResponse | None = None   # remote device that hears JARVIS, else this Mac
@@ -59,6 +61,8 @@ class Hub:
 
     # --- outbound -------------------------------------------------------------
     async def event(self, kind: str, payload: dict | None = None):
+        if self.history and self.history.open is not None:
+            self.history.capture(kind, payload or {})  # what JARVIS says and does goes into the log
         msg = json.dumps({"type": kind, **(payload or {})})
         dead = []
         for ws in self.clients:
@@ -473,6 +477,8 @@ class Hub:
     async def brain_worker(self):
         while True:
             text, source = await self.queue.get()
+            await self.history.ready()  # a memory compaction in progress finishes first
+            self.history.begin(text, source)
             self.current = asyncio.create_task(self.brain.handle(text, source))
             try:
                 await self.current
@@ -481,6 +487,12 @@ class Hub:
             except Exception as e:
                 print(f"[hub] brain crashed: {e!r}")
                 await self.say_and_show("I've hit an internal fault, sir. Check the console.")
+            finally:
+                self.history.end()  # logged even when interrupted
+            try:
+                await self.history.after_request()  # compacts once the context is 60% full
+            except Exception as e:
+                print(f"[hub] memory: {e!r}")
 
     @property
     def ui_visible(self) -> bool:
@@ -671,6 +683,7 @@ async def serve_ws(request, remote: bool, token: str | None = None):
         "modes": HUB.modes.describe(),
         "agenda": {"events": HUB.agenda, "authorized": HUB.agenda_authorized},
         "remote_client": remote,
+        "memory": HUB.history.describe(),
         **({} if remote else {"remote": HUB.remote.describe()}),
     }))
     try:
@@ -725,6 +738,7 @@ def greeting() -> str:
 async def on_startup(app):
     HUB.loop = asyncio.get_running_loop()
     HUB.tools = ToolRunner(HUB)
+    HUB.history = ConversationMemory(HUB)
     HUB.brain = make_brain(HUB)
     if config.MIC_ENABLED:
         HUB.listener = Listener(HUB.loop, HUB.on_phrase, HUB.mic_level, HUB.voice_state)
@@ -747,7 +761,8 @@ async def on_startup(app):
     ]))
     if HUB.listener:
         HUB.listener.start()
-    workers = [HUB.brain_worker, HUB.telemetry_worker, HUB.weather_worker, HUB.media_worker, HUB.agenda_worker]
+    workers = [HUB.brain_worker, HUB.telemetry_worker, HUB.weather_worker, HUB.media_worker, HUB.agenda_worker,
+               HUB.history.idle_worker, HUB.history.catch_up]
     if config.ALERTS:
         workers.append(HUB.watch_worker)
     for worker in workers:

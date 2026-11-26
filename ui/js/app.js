@@ -81,6 +81,7 @@ function handle(m) {
       showMedia(m.media); if (m.agenda) { agenda = m.agenda; renderAgenda(); }
       bootLog(`› cognitive core: ${m.model} via ${m.brain === "API" ? "Anthropic API" : "Claude plan"}${online ? "" : "  [OFFLINE]"}`);
       if (m.modes) applyModes(m.modes);
+      if (m.memory) showMemory(m.memory);
       if (m.remote) updateDevices(m.remote);
       if (REMOTE) micMode = "push";
       refreshState();
@@ -110,6 +111,7 @@ function handle(m) {
     case "weather": showWeather(m); break;
     case "protocol": protocol(m); break;
     case "modes": applyModes(m); break;
+    case "memory": showMemory(m); break;
     case "remote": updateDevices(m); break;
     case "speech_audio": player?.play(m.data); break;
     case "speech_stop": player?.stop(); break;
@@ -327,6 +329,13 @@ function telemetry(t) {
 }
 // ---------------- status bar, media, schedule ----------------
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+// Conversation context in use. JARVIS compacts its memory when this reaches `compact_at` percent.
+function showMemory(m) {
+  const pct = m.percent < 10 ? m.percent.toFixed(1) : Math.round(m.percent);
+  chip("#sb-ctx", m.compacting ? "COMPACTING" : `${pct}%`, m.percent >= m.compact_at * 0.9);
+  $("#sb-ctx").title = `Conversation context: ${m.tokens.toLocaleString()} of ${m.window.toLocaleString()} tokens. `
+    + `JARVIS compacts its memory at ${m.compact_at}% (done ${m.compactions} time${m.compactions === 1 ? "" : "s"} so far); nothing is forgotten.`;
+}
 function chip(id, text, warn) { const el = $(id); el.querySelector("em").textContent = text; el.classList.toggle("warn", !!warn); }
 function sysbar(t) {
   if (t.battery != null) chip("#sb-power", `${t.battery}%${t.charging ? " ⚡" : ""}`, t.battery < 20 && !t.charging);
