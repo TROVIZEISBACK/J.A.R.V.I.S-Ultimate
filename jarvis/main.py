@@ -630,6 +630,7 @@ class Hub:
         while True:
             try:
                 self.last_weather = await weather()
+                self.last_weather_at = time.monotonic()
                 await self.event("weather", self.last_weather)
             except Exception as e:
                 print(f"[hub] weather: {e}")
